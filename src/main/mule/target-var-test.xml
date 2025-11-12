@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="8126e41f-3847-4fda-9c12-1755340fa248" >
+		<http:listener-connection host="localhost" port="8083" />
+	</http:listener-config>
+	<flow name="target-var-test-flow" doc:id="fcf53ceb-386b-457a-b29e-c9c0ceb0ac1d" >
+		<http:listener doc:name="Listener" doc:id="14d4413d-32f3-4fdd-8210-08aa3eaddb22" config-ref="HTTP_Listener_config" path="/test"/>
+		<set-payload value='#["Hi Genius!"]' doc:name="Set Payload" doc:id="5b6cb98b-445e-4883-8c12-eaeb6b7407ef" />
+		<set-variable value="404" doc:name="httpStatus" doc:id="902d3f9f-4db7-443b-9f9d-3c857b1423be" variableName="httpStatus"/>
+		<set-variable value='#["var 1"]' doc:name="Message" doc:id="d1ffe847-08f7-4dc7-a10d-7fa36358eaa4" variableName="message" />
+		<logger level="INFO" doc:name="Logger" doc:id="8b274450-11a3-48a7-b1f0-548004738758" message='#[%dw 2.0&#10;output json&#10;---&#10;{&#10;	var1 : vars.httpStatus,&#10;	var2 : vars.message,&#10;	payload: payload,&#10;	targetPayload: vars.targetPayload default ""&#10;}]'/>
+		<flow-ref doc:name="Flow Reference" doc:id="fa17e4e7-20fb-4c38-a4f8-e1d8930ade56" name="target-var-testSub_Flow" target="targetPayload"/>
+		<logger level="INFO" doc:name="Logger1" doc:id="13f4209e-dea1-4206-b9ed-09f5e97a1c83" message='#[%dw 2.0&#10;output json&#10;---&#10;{&#10;	var1 : vars.httpStatus,&#10;	var2 : vars.message,&#10;	payload: payload,&#10;	targetPayload: vars.targetPayload default ""&#10;}]' />
+	</flow>
+	<sub-flow name="target-var-testSub_Flow" doc:id="3e83f440-09bf-4207-b708-3fe8fac4a78c" >
+		<set-payload value='#["payload 2"]' doc:name="Set Payload" doc:id="e8437a67-633c-46fe-9e41-ed21f48b9c25" />
+		<set-variable value='#["400 changed"]' doc:name="httpStatus" doc:id="448d4016-4e67-4a51-a287-c462f4ff68e7" variableName="httpStatus" />
+		<set-variable value='#["var 2"]' doc:name="Message" doc:id="b359a1e0-9f77-4a53-bc3d-e7e238aa9f54" variableName="message" />
+		<logger level="INFO" doc:name="Logger" doc:id="cf202a5a-4101-4ab4-ba7f-be6d98686c95" message='#[%dw 2.0&#10;output json&#10;---&#10;{&#10;	var1 : vars.httpStatus,&#10;	var2 : vars.message,&#10;	payload: payload,&#10;	targetPayload: vars.targetPayload default ""&#10;}]' />
+	</sub-flow>
+</mule>
