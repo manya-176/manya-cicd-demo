@@ -1,0 +1,164 @@
+name: "Maven Github Actions App Deployment Workflow"
+
+# Trigger the workflow manually using the workflow_dispatch event with inputs for environment and commit message
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment Environment"
+        required: true
+        type: choice
+        options:
+          - DEV
+          - PROD
+      commit:
+        description: "Commit Message"
+        required: true
+        type: string
+
+# Display the commit message, environment, and project name in the run name for better traceability
+run-name: "Commit: ${{ inputs.commit }} | Environment: ${{ inputs.environment }} | manya-cicd-demo"
+
+jobs:
+  # Testing job
+  Test:
+    runs-on: ubuntu-latest
+    steps:
+    # Checkout the code from the repository
+    - name: "Checkout Repository ${{ github.repository }}"
+      uses: actions/checkout@v4
+    # Cache Maven dependencies to avoid downloading them every time and speed up the workflow
+    - name: "Cache Dependencies"
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/${{ inputs.environment }}/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+    # Setup Java 17
+    - name: "Setup Java 17"
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    # Run tests with Maven, passing environment-specific parameters
+    - name: "Test with Maven"
+      env:
+        connectedAppId: ${{ secrets.connected_app_id }}
+        connectedAppSecret: ${{ secrets.connected_app_secret }}
+      run: |
+        if [ "${{ inputs.environment }}" == "DEV" ];
+        then
+          mvn clean test -D"mule.env"="${{ secrets.dev_mule_env }}" -D"mule.key"="${{ secrets.dev_mule_key }}" --settings settings/settings.xml
+        else
+          mvn clean test -D"mule.env"="${{ secrets.prod_mule_env }}" -D"mule.key"="${{ secrets.prod_mule_key }}" --settings settings/settings.xml
+        fi
+    # Upload the MUnit test report to GitHub after the tests are executed
+    - name: "Upload MUnit Report"
+      uses: actions/upload-artifact@v4
+      with:
+        name: "Munit Report"
+        path: target/site/munit/coverage
+        retention-days: 2
+
+  # Build job that runs after tests are completed to build the application
+  Build:
+    needs: Test
+    runs-on: ubuntu-latest
+    steps:
+    # Checkout the code from the repository
+    - name: "Checkout Repository ${{ github.repository }}"
+      uses: actions/checkout@v4
+    # Cache Maven dependencies to speed up the build process
+    - name: "Cache Dependencies"
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/${{ inputs.environment }}/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+    # Setup Java 17
+    - name: "Setup Java 17"
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    # Build the application with Maven, skipping tests as they've already been run
+    - name: "Build with Maven"
+      run: |
+        if [ "${{ inputs.environment }}" == "DEV" ];
+        then
+          mvn -B package --file pom.xml -D"mule.env"="${{ secrets.dev_mule_env }}" -D"mule.key"="${{ secrets.dev_mule_key }}" -DskipTests
+        else
+          mvn -B package --file pom.xml -D"mule.env"="${{ secrets.prod_mule_env }}" -D"mule.key"="${{ secrets.prod_mule_key }}" -DskipTests
+        fi
+    # Upload the built JAR artifact for use in subsequent jobs
+    - name: "Upload Artifact" 
+      uses: actions/upload-artifact@v4
+      with:
+          name: "Artifacts"
+          path: target/*.jar
+          retention-days: 2
+
+  # Publish to Anypoint Exchange
+  Publish-To-Exchange:
+    needs: Build
+    runs-on: ubuntu-latest
+    steps:
+    # Checkout the code from the repository
+    - name: "Checkout Repository ${{ github.repository }}"
+      uses: actions/checkout@v4
+    # Cache Maven dependencies to speed up the deployment
+    - name: "Cache Dependencies"
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/${{ inputs.environment }}/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+    # Download the built JAR file from the Build job
+    - name: "Download the JAR File"
+      uses: actions/download-artifact@v4
+      with:
+        name: "Artifacts"
+    # Publish the application JAR to Anypoint Exchange
+    - name: "Publish to Exchange"
+      env:
+        connectedAppId: ${{ secrets.connected_app_id }}
+        connectedAppSecret: ${{ secrets.connected_app_secret }}
+      run: mvn clean deploy -DskipTests --settings settings/settings.xml
+
+  # Deployment to CloudHub 2.0
+  Deploy-To-CloudHub:
+    needs: Publish-To-Exchange
+    runs-on: ubuntu-latest
+    steps:
+    # Checkout the code from the repository
+    - name: "Checkout Repository ${{ github.repository }}"
+      uses: actions/checkout@v4
+    # Cache Maven dependencies for CloudHub 2.0 deployment
+    - name: "Cache Dependencies"
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/${{ inputs.environment }}/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+    # Download the JAR file for deployment
+    - name: "Download the JAR File"
+      uses: actions/download-artifact@v4
+      with:
+        name: "Artifacts"
+    # Deploy the application to CloudHub 2.0 based on the environment specified in inputs
+    - name: "Deploy to ${{ inputs.environment }}"
+      env:
+        connectedAppId: ${{ secrets.connected_app_id }}
+        connectedAppSecret: ${{ secrets.connected_app_secret }}
+        grantType: ${{ secrets.grant_type }}
+      run: |
+        if [ "${{ inputs.environment }}" == "DEV" ];
+        then
+          mvn clean deploy -DskipTests -DmuleDeploy -DClientId="$connectedAppId" -DClientSecret="$connectedAppSecret" -DjavaVersion="17" -DGrantType="$grantType" -Denvironment="${{ inputs.environment }}" -D"mule.env"="${{ secrets.dev_mule_env }}" -D"mule.key"="${{ secrets.dev_mule_key }}" -D"application.name"="manya-cicd-demo-dev"
+        else
+          mvn clean deploy -DskipTests -DmuleDeploy -DClientId="$connectedAppId" -DClientSecret="$connectedAppSecret" -DjavaVersion="17" -DGrantType="$grantType" -Denvironment="${{ inputs.environment }}" -D"mule.env"="${{ secrets.prod_mule_env }}" -D"mule.key"="${{ secrets.prod_mule_key }}" -D"application.name"="manya-cicd-demo"
+        fi
