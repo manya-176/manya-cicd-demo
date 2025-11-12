@@ -7,7 +7,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
 http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="8126e41f-3847-4fda-9c12-1755340fa248" >
-		<http:listener-connection host="localhost" port="8083" />
+		<http:listener-connection host="0.0.0.0" port="8083" />
 	</http:listener-config>
 	<flow name="target-var-test-flow" doc:id="fcf53ceb-386b-457a-b29e-c9c0ceb0ac1d" >
 		<http:listener doc:name="Listener" doc:id="14d4413d-32f3-4fdd-8210-08aa3eaddb22" config-ref="HTTP_Listener_config" path="/test"/>
