@@ -9,7 +9,7 @@ on:
         required: true
         type: choice
         options:
-          - SANDBOX
+          - Sandbox
           - PROD
       commit:
         description: "Commit Message"
@@ -47,7 +47,7 @@ jobs:
         connectedAppId: ${{ secrets.connected_app_id }}
         connectedAppSecret: ${{ secrets.connected_app_secret }}
       run: |
-        if [ "${{ inputs.environment }}" == "SANDBOX" ];
+        if [ "${{ inputs.environment }}" == "Sandbox" ];
         then
           mvn clean test -D"mule.env"="${{ secrets.sandbox_mule_env }}" -D"mule.key"="${{ secrets.sandbox_mule_key }}" --settings settings/settings.xml
         else
@@ -86,7 +86,7 @@ jobs:
     # Build the application with Maven, skipping tests as they've already been run
     - name: "Build with Maven"
       run: |
-        if [ "${{ inputs.environment }}" == "SANDBOX" ];
+        if [ "${{ inputs.environment }}" == "Sandbox" ];
         then
           mvn -B package --file pom.xml -D"mule.env"="${{ secrets.sandbox_mule_env }}" -D"mule.key"="${{ secrets.sandbox_mule_key }}" -DskipTests
         else
@@ -156,7 +156,7 @@ jobs:
         connectedAppSecret: ${{ secrets.connected_app_secret }}
         grantType: ${{ secrets.grant_type }}
       run: |
-        if [ "${{ inputs.environment }}" == "SANDBOX" ];
+        if [ "${{ inputs.environment }}" == "Sandbox" ];
         then
           mvn clean deploy -DskipTests -DmuleDeploy -DClientId="$connectedAppId" -DClientSecret="$connectedAppSecret" -DjavaVersion="17" -DGrantType="$grantType" -Denvironment="${{ inputs.environment }}" -D"mule.env"="${{ secrets.sandbox_mule_env }}" -D"mule.key"="${{ secrets.sandbox_mule_key }}" -D"application.name"="manya-cicd-demo-sandbox"
         else
